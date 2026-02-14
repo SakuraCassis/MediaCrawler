@@ -229,31 +229,23 @@ async def save_creator(user_id: str, creator: Dict):
     await XhsStoreFactory.create_store().store_creator(local_db_item)
 
 
-async def update_xhs_note_image(note_id, pic_content, extension_file_name):
-    """
-    Update Xiaohongshu note image
-    Args:
-        note_id:
-        pic_content:
-        extension_file_name:
-
-    Returns:
-
-    """
-
-    await XiaoHongShuImage().store_image({"notice_id": note_id, "pic_content": pic_content, "extension_file_name": extension_file_name})
+async def update_xhs_note_image(note_id, pic_content, extension_file_name, title, timestamp, nickname):
+    await XiaoHongShuImage().store_image({
+        "notice_id": note_id,
+        "pic_content": pic_content,
+        "extension_file_name": extension_file_name,
+        "title": title,
+        "time": timestamp,
+        "nickname": nickname
+    })
 
 
-async def update_xhs_note_video(note_id, video_content, extension_file_name):
-    """
-    Update Xiaohongshu note video
-    Args:
-        note_id:
-        video_content:
-        extension_file_name:
-
-    Returns:
-
-    """
-
-    await XiaoHongShuVideo().store_video({"notice_id": note_id, "video_content": video_content, "extension_file_name": extension_file_name})
+async def update_xhs_note_video(note_id, video_content, extension_file_name, title, timestamp, nickname):
+    await XiaoHongShuVideo().store_video({
+        "notice_id": note_id,
+        "video_content": video_content,
+        "extension_file_name": extension_file_name,
+        "title": title,
+        "time": timestamp,
+        "nickname": nickname
+    })

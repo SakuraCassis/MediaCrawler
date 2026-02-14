@@ -25,109 +25,135 @@ import pathlib
 from typing import Dict
 
 import aiofiles
+from PIL import Image
 
 from base.base_crawler import AbstractStoreImage, AbstractStoreVideo
 from tools import utils
 import config
+import io
+import re
+import os
+from datetime import datetime
+def clean_title(title: str) -> str:
+        # 仅去掉非法路径字符
+    title = re.sub(r'[\\/:*?"<>|\n\r\t]', '', title)
 
+    # 去掉emoji（可选）
+    title = re.sub(r'[\U00010000-\U0010ffff]', '', title)
+
+    return title[:30]   # 控制长度
+
+def safe_name(name: str):
+    if not name:
+        return "unknown"
+    name = re.sub(r'[\\/:"*?<>|\n\r]+', "_", name)
+    return name.strip()
 
 class XiaoHongShuImage(AbstractStoreImage):
     def __init__(self):
         if config.SAVE_DATA_PATH:
-            self.image_store_path = f"{config.SAVE_DATA_PATH}/xhs/images"
+            self.base_store_path = f"{config.SAVE_DATA_PATH}/xhs"
         else:
-            self.image_store_path = "data/xhs/images"
+            self.base_store_path = "data/xhs"
 
-    async def store_image(self, image_content_item: Dict):
-        """
-        store content
+    async def store_image(self, item: Dict):
+        await self.save_image(
+            item["pic_content"],
+            item["extension_file_name"],
+            item["title"],
+            item["time"],
+            item["nickname"]
+        )
+    async def save_image(
+            self,
+            pic_content: bytes,
+            extension_file_name: str,
+            title: str,
+            timestamp: int,
+            nickname: str
+    ):
+        ts = timestamp / 1000
 
-        Args:
-            image_content_item:
+        date_str = datetime.fromtimestamp(ts).strftime("%Y-%m-%d")
+        safe_title = clean_title(title)
+        idx = extension_file_name.split('.')[0]
 
-        Returns:
+        filename = f"{date_str}_{safe_title}_{idx}.jpg"
+        safe_nickname = safe_name(nickname)
 
-        """
-        await self.save_image(image_content_item.get("notice_id"), image_content_item.get("pic_content"), image_content_item.get("extension_file_name"))
+        user_dir = os.path.join(self.base_store_path, safe_nickname, "images")
+        pathlib.Path(user_dir).mkdir(parents=True, exist_ok=True)
+        save_path = os.path.join(user_dir, filename)
+        if os.path.exists(save_path):
+            utils.logger.info(f"[XHS] skip existing {save_path}")
+            return
+        try:
+            img = Image.open(io.BytesIO(pic_content))
+            img = img.convert("RGB")
 
-    def make_save_file_name(self, notice_id: str, extension_file_name: str) -> str:
-        """
-        make save file name by store type
+            img.save(
+                save_path,
+                "JPEG",
+                quality=95,
+                subsampling=0,   # 保留细节
+                optimize=True
+            )
+            os.utime(save_path, (ts, ts))
+            utils.logger.info(f"[XHS] saved {save_path}")
 
-        Args:
-            notice_id: notice id
-            extension_file_name: image filename with extension
+        except Exception as e:
+            utils.logger.error(f"[XHS] convert fail, fallback raw save: {e}")
 
-        Returns:
-
-        """
-        return f"{self.image_store_path}/{notice_id}/{extension_file_name}"
-
-    async def save_image(self, notice_id: str, pic_content: str, extension_file_name):
-        """
-        save image to local
-
-        Args:
-            notice_id: notice id
-            pic_content: image content
-            extension_file_name: image filename with extension
-
-        Returns:
-
-        """
-        pathlib.Path(self.image_store_path + "/" + notice_id).mkdir(parents=True, exist_ok=True)
-        save_file_name = self.make_save_file_name(notice_id, extension_file_name)
-        async with aiofiles.open(save_file_name, 'wb') as f:
-            await f.write(pic_content)
-            utils.logger.info(f"[XiaoHongShuImageStoreImplement.save_image] save image {save_file_name} success ...")
+            # ===== fallback 原始写盘 =====
+            async with aiofiles.open(save_path, 'wb') as f:
+                await f.write(pic_content)
+            os.utime(save_path, (ts, ts))
 
 
 class XiaoHongShuVideo(AbstractStoreVideo):
     def __init__(self):
         if config.SAVE_DATA_PATH:
-            self.video_store_path = f"{config.SAVE_DATA_PATH}/xhs/videos"
+            self.base_store_path = f"{config.SAVE_DATA_PATH}/xhs"
         else:
-            self.video_store_path = "data/xhs/videos"
+            self.base_store_path = "data/xhs"
 
-    async def store_video(self, video_content_item: Dict):
-        """
-        store content
+    async def store_video(self, item: Dict):
+        await self.save_video(
+            item["video_content"],
+            item["extension_file_name"],
+            item["title"],
+            item["time"],
+            item["nickname"]
+        )
 
-        Args:
-            video_content_item:
 
-        Returns:
+    async def save_video(
+        self,
+        video_content: bytes,
+        extension_file_name: str,
+        title: str,
+        timestamp: int,
+        nickname: str
+    ):
 
-        """
-        await self.save_video(video_content_item.get("notice_id"), video_content_item.get("video_content"), video_content_item.get("extension_file_name"))
+        # ========= 命名 =========
+        ts = timestamp / 1000
+        date_str = datetime.fromtimestamp(ts).strftime("%Y-%m-%d")
+        safe_title = clean_title(title)
+        safe_nickname = safe_name(nickname)
 
-    def make_save_file_name(self, notice_id: str, extension_file_name: str) -> str:
-        """
-        make save file name by store type
+        idx = extension_file_name.split('.')[0]
+        ext = extension_file_name.split('.')[-1]
 
-        Args:
-            notice_id: notice id
-            extension_file_name: video filename with extension
+        filename = f"{date_str}_{safe_title}_{idx}.{ext}"
 
-        Returns:
-
-        """
-        return f"{self.video_store_path}/{notice_id}/{extension_file_name}"
-
-    async def save_video(self, notice_id: str, video_content: str, extension_file_name):
-        """
-        save video to local
-
-        Args:
-            notice_id: notice id
-            video_content: video content
-            extension_file_name: video filename with extension
-
-        Returns:
-
-        """
-        pathlib.Path(self.video_store_path + "/" + notice_id).mkdir(parents=True, exist_ok=True)
-        save_file_name = self.make_save_file_name(notice_id, extension_file_name)
-        async with aiofiles.open(save_file_name, 'wb') as f:
+        user_dir = os.path.join(self.base_store_path, safe_nickname, "videos")
+        pathlib.Path(user_dir).mkdir(parents=True, exist_ok=True)
+        save_path = os.path.join(user_dir, filename)
+        if os.path.exists(save_path):
+            utils.logger.info(f"[XHS] skip existing {save_path}")
+            return
+        async with aiofiles.open(save_path, 'wb') as f:
             await f.write(video_content)
-            utils.logger.info(f"[XiaoHongShuVideoStoreImplement.save_video] save video {save_file_name} success ...")
+        os.utime(save_path, (ts, ts))
+        utils.logger.info(f"[XHS] saved video {save_path}")

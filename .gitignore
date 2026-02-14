@@ -179,3 +179,5 @@ agent_zone
 debug_tools
 
 database/*.db
+.DS_Store
+config/xhs_config.py

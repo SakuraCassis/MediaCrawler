@@ -214,12 +214,13 @@ class XiaoHongShuCrawler(AbstractCrawler):
                 xsec_source=creator_info.xsec_source,
             )
 
-            note_ids = []
-            xsec_tokens = []
-            for note_item in all_notes_list:
-                note_ids.append(note_item.get("note_id"))
-                xsec_tokens.append(note_item.get("xsec_token"))
-            await self.batch_get_note_comments(note_ids, xsec_tokens)
+            # 取消抓取评论
+            # note_ids = []
+            # xsec_tokens = []
+            # for note_item in all_notes_list:
+            #     note_ids.append(note_item.get("note_id"))
+            #     xsec_tokens.append(note_item.get("xsec_token"))
+            # await self.batch_get_note_comments(note_ids, xsec_tokens)
 
     async def fetch_creator_notes_detail(self, note_list: List[Dict]):
         """Concurrently obtain the specified post list and save the data"""
@@ -236,6 +237,11 @@ class XiaoHongShuCrawler(AbstractCrawler):
         note_details = await asyncio.gather(*task_list)
         for note_detail in note_details:
             if note_detail:
+                user = note_detail.get("user") or {}
+                note_detail.update({
+                    "nickname": user.get("nickname", "unknown"),
+                    "user_id": user.get("user_id", "unknown")
+                })
                 await xhs_store.update_xhs_note(note_detail)
                 await self.get_notice_media(note_detail)
 
@@ -487,7 +493,7 @@ class XiaoHongShuCrawler(AbstractCrawler):
                 continue
             extension_file_name = f"{picNum}.jpg"
             picNum += 1
-            await xhs_store.update_xhs_note_image(note_id, content, extension_file_name)
+            await xhs_store.update_xhs_note_image(note_id, content, extension_file_name, note_item.get("title", ""), note_item.get("time", 0), note_item.get("nickname", "unknown"))
 
     async def get_notice_video(self, note_item: Dict):
         """Get note videos. Please use get_notice_media
@@ -511,4 +517,4 @@ class XiaoHongShuCrawler(AbstractCrawler):
                 continue
             extension_file_name = f"{videoNum}.mp4"
             videoNum += 1
-            await xhs_store.update_xhs_note_video(note_id, content, extension_file_name)
+            await xhs_store.update_xhs_note_video(note_id, content, extension_file_name, note_item.get("title", ""), note_item.get("time", 0), note_item.get("nickname", "unknown"))
